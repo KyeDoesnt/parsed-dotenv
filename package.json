@@ -1,16 +1,16 @@
 {
-  "name": "parsed-dotenv",
+  "name": "pdenv",
   "version": "0.0.1",
   "description": "parsed .env variables from the start.",
   "main": "lib/pdenv.js",
   "types": "lib/pdenv.d.ts",
-  "repository": "https://github.com/KyeDoesnt/parsed-dotenv.git",
+  "repository": "https://github.com/KyeDoesnt/pdenv.git",
   "author": "Kye Cedar",
   "license": "MIT",
   "scripts": {
     "lib:build": "rm ./lib/* && tsc",
     "lib:run": "node .",
-    "lib:dev": "tsc -w & nodemon ./lib/parsed-dotenv.js",
+    "lib:dev": "tsc -w & nodemon ./lib/pdenv.js",
     "example:build": "rm ./example/dist/** && tsc -p ./example/tsconfig.json",
     "example:run": "node ./example/dist/main.js",
     "example:dev": "tsnd --respawn --transpile-only --exit-child ./example/src/main.ts"
