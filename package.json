@@ -1,6 +1,6 @@
 {
   "name": "pdenv",
-  "version": "0.0.1",
+  "version": "0.7.0",
   "description": "parsed .env variables from the start.",
   "main": "lib/pdenv.js",
   "types": "lib/pdenv.d.ts",
