@@ -368,15 +368,6 @@ const m_parse = (
 		const is_number : boolean = m_testAll(data, number_parse_exps); 
 		const is_bool   : boolean = m_testAll(data, bool_parse_exps);
 
-		// TODO make this much better 👇
-		// if the string has string characters at both the beginning and end, remove them.
-		if(data.length > 1)
-			{
-				let quotes = JSON.stringify([data[0], data[data.length - 1]])
-				if(is_string) if(quotes == JSON.stringify(['"', '"']))
-					data = data.slice(1, -1);
-			}
-
 		// default to parsing by string.
 		if(!(is_string && is_array && is_object && is_number && is_bool)) is_string = true;
 		
@@ -387,6 +378,15 @@ const m_parse = (
 		else if(is_array || is_object) return JSON.parse(data);
 		else if(is_string)
 			{
+				// TODO make this much better 👇
+				// if the string has string characters at both the beginning and end, remove them.
+				if(data.length > 1)
+					{
+						let quotes = JSON.stringify([data[0], data[data.length - 1]])
+						if(is_string) if(quotes == '["\\"","\\""]')
+							data = data.slice(1, -1);
+					}
+				
 				data = unescapejs(data);
 				return data;
 			}
@@ -454,7 +454,7 @@ const m_log = (message: string, priority: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR' 
 			: '';
 
 		console.log(`\x1b[0m\x1b[2m[pdenv]\x1b[0m ${prio_text}${message}`);
-		
+
 		// only call error callback if not a dummy log.
 		if(!dummy && priority == 'ERROR' && m_onError)
 			m_onError(message);

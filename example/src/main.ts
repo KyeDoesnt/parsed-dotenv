@@ -1,3 +1,4 @@
+import { isArray } from 'util';
 import pdenv from '../../lib/pdenv';
 // would be:   import pdenv from 'pdenv';
 
@@ -8,34 +9,80 @@ console.log('\n');
 pdenv.config({
 	errorFn: (err: string) => { throw err; },
 	logging: true,
-	verbose: true,
 });
 
-const EXAMPLE_DEFAULTS =
+
+
+// INTERFACES
+interface I_FAVOURITES
 	{
-		NUMBER_EXAMPLE  : 96,
-		STRING_EXAMPLE  : 'The dog jumps the lazy fox,\noh how the turns have tabled.',
-		ARRAY_EXAMPLE   : [ 'there are two items in this array', 1, 'that was a lie' ],
-		BOOLEAN_EXAMPLE : false,
-		SUSSY_EXAMPLE   : { look_at_this_funny_crewmate: 'ඞ' },
+		activity ?: string;
+		food     ?: string;
+		number   ?: number;
+	}
+
+interface I_VET_VISIT
+	{
+		date   : string;
+		reason : string;
+	}
+
+interface I_DATA
+	{
+		HOST            : string;
+		PORT            : number;
+		USERNAME        : string;
+		PASSWORD        : string;
+		FAVOURITES      : I_FAVOURITES;
+		VET_VISITS      : (string | I_VET_VISIT)[];
+		LIKES_SCRATCHES : boolean;
+	}
+
+
+
+// ENV
+const ENV_DEFAULTS =
+	{
+		HOST: '', PORT: 0,
+		
+		USERNAME: '', PASSWORD: '',
+		FAVOURITES: {}, VET_VISITS: [],
+		LIKES_SCRATCHES: false,
 	};
 
-// todo in the future, make a "defaults" option in config to configure what the defaults are.
-const { NUMBER_EXAMPLE, STRING_EXAMPLE, ARRAY_EXAMPLE, BOOLEAN_EXAMPLE, SUSSY_EXAMPLE } =
-	Object.assign({...EXAMPLE_DEFAULTS}, process.pdenv);
+// todo? in the future, make a "defaults" option in config to configure what the defaults are.
+const
+	{
+		// INTERNET.
+		HOST, PORT,
+		
+		// USER.
+		USERNAME, PASSWORD,
+		FAVOURITES, VET_VISITS,
+		LIKES_SCRATCHES,
+	}: I_DATA = Object.assign({...ENV_DEFAULTS}, process.pdenv);
 
-// log the values.
-console.log(NUMBER_EXAMPLE);
-console.log(`${typeof NUMBER_EXAMPLE}\n`);
 
-console.log(STRING_EXAMPLE);
-console.log(`${typeof STRING_EXAMPLE}\n`);
 
-console.log(ARRAY_EXAMPLE);
-console.log(`${typeof ARRAY_EXAMPLE}\n`);
+// LOGIN
+console.log('\n');
 
-console.log(BOOLEAN_EXAMPLE);
-console.log(`${typeof BOOLEAN_EXAMPLE}\n`);
+const accessInternet = (host: string, port: number): void =>
+	{ console.log(`internet access obtained. ${host}:${port}`); };
 
-console.log(SUSSY_EXAMPLE);
-console.log(`${typeof SUSSY_EXAMPLE}`);
+const userLogin = (username: string, password: string): void =>
+	{ console.log(`user has logged in. ( ${username}: ${Array(password.length + 1).join('*')} )`); };
+
+const logData = (name: string, data: any): void =>
+	{
+		console.log(`\n${name} : ${Array.isArray(data) ? 'array' : typeof data} =`);
+		console.log(data);
+	};
+
+
+accessInternet(HOST, PORT);
+userLogin(USERNAME, PASSWORD);
+
+logData('favourites', FAVOURITES);
+logData('vet visits', VET_VISITS);
+logData('likes scratches', LIKES_SCRATCHES);
