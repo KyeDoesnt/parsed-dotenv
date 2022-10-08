@@ -3,16 +3,19 @@
 
 // === === === === === === === === === === === === ===
 
-import
-	{
+/// Please bear with my formatting, it makes it easier for me to read
+/// and I just wanted to make something that was functional.
+
+// === === === === === === === === === === === === ===
+
+import {
 		existsSync   as fsExistsSync,
 		readFileSync as fsReadFileSync
 	} from 'fs';
 
 import { resolve as pathResolve } from 'path';
 import { homedir as osHomedir } from 'os';
-import { listenerCount } from 'process';
-import { stringify } from 'querystring';
+const unescapejs = require('unescape-js');
 
 const pkgjson = require('../package.json');
 
@@ -20,7 +23,7 @@ const version: string = 'v' + pkgjson.version;
 
 let m_do_logging         : boolean             = false;
 let m_do_verbose_logging : boolean             = false;
-let m_on_error           : (() => void) | null = null;
+let m_onError            : PDENV_ERROR_CALLBACK | null = null;
 
 // === === === === === === === === === === === === ===
 
@@ -35,14 +38,28 @@ declare global { namespace NodeJS { interface Process
 
 process.pdenv = {};
 
+type PDENV_ERROR_CALLBACK =
+	(err: string) => void;
+
+type PDENV_CUSTOM_PARSE_FUNCTION =
+	(string_parse_exps: RegExp[], array_parse_exps: RegExp[], object_parse_exps: RegExp[], number_parse_exps: RegExp[], bool_parse_exps: RegExp[]) => any;
+
+// === === === === === === === === === === === === ===
+
+const PDENV_ESCAPED_BACKSLASH = '_PDENV{**ESCAPED_BACKSLASH}';
+
 // === === === === === === === === === === === === ===
 
 interface I_PDENV_ConfigOptions
 	{
-		/** Capitalization of parsed values.
-		 * - "uppercase" - Makes all pdenv values uppercase. ( VARIABLEFROMENV )
-		 * - "lowercase" - Makes all pdenv values lowercase. ( variablefromenv )
-		 * - "as-is"     - Keeps capitalization from pdenv.  ( VariableFromENV )
+		/** Error callback. Called when an error occurs in pdenv.
+		 * @default null */
+		errorFn?: PDENV_ERROR_CALLBACK | null;
+
+		/** Capitalization of parsed keys.
+		 * - "uppercase" - Makes all pdenv keys uppercase. ( VARIABLEFROMENV )
+		 * - "lowercase" - Makes all pdenv keys lowercase. ( variablefromenv )
+		 * - "as-is"     - Keeps capitalization of keys from pdenv.  ( VariableFromENV )
 		 * @default 'as-is' */
 		capitalization?: 'uppercase' | 'lowercase' | 'as-is';
 
@@ -60,22 +77,26 @@ interface I_PDENV_ConfigOptions
 
 		/** Custom function to parse values of variables.
 		 * @default undefined */
-		custom_parse_fn?: (() => any) | undefined;
+		custom_parse_fn?: PDENV_CUSTOM_PARSE_FUNCTION | undefined;
 
-		/** Expressions of acceptable strings.
-		 * @default  */ // TODO
+		/** Expressions that test for acceptable strings.
+		 * @default [/^".*"$/] */ // TODO
 		string_parse_exps?: RegExp[];
 
-		/** Expressions of acceptable arrays.
-		 * @default  */ // TODO
+		/** Expressions that test for acceptable arrays.
+		 * @default [/^\[.*\]$/] */ // TODO
 		array_parse_exps?: RegExp[];
 
-		/** Expressions of acceptable numbers.
-		 * @default [] */ // TODO
+		/** Expressions that test for acceptable objects.
+		 * @default [/^\{.*\}$/] */
+		object_parse_exps?: RegExp[];
+
+		/** Expressions that test for acceptable numbers.
+		 * @default [/((^[0-9]+$)|(^[0-9]*\.[0-9]+$))/] */ // TODO
 		number_parse_exps?: RegExp[];
 
-		/** Expressions of acceptable booleans.
-		 * @default [] */ // TODO
+		/** Expressions that test for acceptable booleans.
+		 * @default [/(^true$)|(^false$)/i] */ // TODO
 		bool_parse_exps?: RegExp[];
 
 		/** Name of .env file.
@@ -90,11 +111,11 @@ interface I_PDENV_ConfigOptions
 		 * @default 'utf-8' */
 		encoding?: BufferEncoding;
 
-		/** Output logs to console?
+		/** If pdenv outputs logs to console.
 		 * @default false */
 		logging?: boolean;
 
-		/** Output debug content to console?
+		/** If pdenv outputs debug content to console.
 		 * @default false */
 		verbose?: boolean;
 	}
@@ -102,6 +123,7 @@ interface I_PDENV_ConfigOptions
 // we have two of these so the errors go away :(
 interface I_PDENV_ConfigDefaults
 	{
+		errorFn            : null;
 		capitalization     : 'uppercase' | 'lowercase' | 'as-is';
 		extract_exp        : RegExp;
 		trim_exp           : RegExp;
@@ -109,6 +131,7 @@ interface I_PDENV_ConfigDefaults
 		custom_parse_fn    : undefined;
 		string_parse_exps  : RegExp[];
 		array_parse_exps   : RegExp[];
+		object_parse_exps  : RegExp[];
 		number_parse_exps  : RegExp[];
 		bool_parse_exps    : RegExp[];
 		file_name          : string;
@@ -121,13 +144,15 @@ interface I_PDENV_ConfigDefaults
 /** Default pdenv config values. */
 const PDENV_CONFIGDEFAULTS: I_PDENV_ConfigDefaults =
 	{
+		errorFn            : null,
 		capitalization     : 'as-is',
 		extract_exp        : /(.+)=(.+)/,
 		trim_exp           : /(^(\s+)|(\s+)$)/g,
 		comment_exp        : /((?:(?!#).)*)/,
 		custom_parse_fn    : undefined,
-		string_parse_exps  : [/^'.*'$/, /^".*"$/, /^`.*`$/],
-		array_parse_exps   : [/^\[.*\]$/], // TODO impliment array shit
+		string_parse_exps  : [/^".*"$/],
+		array_parse_exps   : [/^\[.*\]$/],
+		object_parse_exps  : [/^\{.*\}$/],
 		number_parse_exps  : [/((^[0-9]+$)|(^[0-9]*\.[0-9]+$))/],
 		bool_parse_exps    : [/(^true$)|(^false$)/i],
 		file_name          : '.env',
@@ -137,10 +162,48 @@ const PDENV_CONFIGDEFAULTS: I_PDENV_ConfigDefaults =
 		verbose            : false,
 	};
 
+/** Configures and loads in environment variables to `process.pdenv`.
+ * @param {I_PDENV_ConfigOptions}					[options]
+ * @param {PDENV_ERROR_CALLBACK}					[options.errorFn=null]
+ *													- Error callback. Called when an error occurs in pdenv.
+ * @param {'as-is' | 'lowercase' | 'uppercase'}		[options.capitalization='as-is']
+ *													- Capitalization of parsed keys.
+ * @param {RegExp}									[options.extract_exp=/(.+)=(.+)/]
+ *													- Expression that matches for lines to extract as variables from `.env` file.
+ * @param {RegExp}									[options.trim_exp=/(^(\s+)|(\s+)$)/g]
+ *													- Expression that removes leading and trailing whitespace.
+ * @param {RegExp}									[options.comment_exp=/((?:(?!#).)*)/]
+ *													- Expression that matches for everything before the comment.
+ * @param {PDENV_CUSTOM_PARSE_FUNCTION | undefined}	[options.custom_parse_fn=undefined]
+ *													- Custom function that's used instead of normal parse function.
+ * @param {RegExp[]}								[options.string_parse_exps=[/^".*"$/]]
+ *													- Expressions that test for perceived strings as values.
+ * @param {RegExp[]}								[options.array_parse_exps=[/^\[.*\]$/]]
+ *													- Expressions that test for perceived arrays as values.
+ * @param {RegExp[]}								[options.object_parse_exps=[/^\{.*\}$/]]
+ *													- Expressions that test for perceived objects as values.
+ * @param {RegExp[]}								[options.number_parse_exps=[/((^[0-9]+$)|(^[0-9]*\.[0-9]+$))/]]
+ *													- Expressions that test for perceived numbers as values.
+ * @param {RegExp[]}								[options.bool_parse_exps=[/(^true$)|(^false$)/i]]
+ *													- Expressions that test for perceived booleans as values.
+ * @param {string}									[options.file_name='.env']
+ *													- Name of the file with the environment variables you wanna parse.
+ * @param {string}									[options.directory='']
+ *													- Path to the directory, relative to the `package.json` file. Can be absolute.
+ * @param {BufferEncoding}							[options.encoding='utf-8']
+ *													- Encoding of the environment file.
+ * @param {boolean}									[options.logging=false]
+ *													- If pdenv should log to console.
+ * @param {boolean}									[options.verbose=false]
+ *													- If pdenv should log debug info to console ( makes it talk a lot ).
+ */
 const config = (options: I_PDENV_ConfigOptions = {}): void =>
 	{
 		const
 			{
+				// error.
+				errorFn,
+
 				// text.
 				capitalization,
 
@@ -152,7 +215,7 @@ const config = (options: I_PDENV_ConfigOptions = {}): void =>
 
 				// parsing.
 				custom_parse_fn, string_parse_exps, array_parse_exps,
-				number_parse_exps, bool_parse_exps,
+				object_parse_exps, number_parse_exps, bool_parse_exps,
 
 				// logging.
 				logging, verbose,
@@ -174,6 +237,9 @@ const config = (options: I_PDENV_ConfigOptions = {}): void =>
 		
 		m_log('\n');
 
+		// set error callback if provided one.
+		if(errorFn) m_onError = errorFn;
+
 		// resolve home directory. ( '~/Documents/' -> '/home/username/Documents/' )
 		let directory_split = directory.split('/');
 		let fmt_directory =
@@ -187,10 +253,7 @@ const config = (options: I_PDENV_ConfigOptions = {}): void =>
 
 		// check if file exists.
 		if(!fsExistsSync(file_path))
-			{
-				m_log('unable to find file. if file exists, check read perms.', 'WARN');
-				return;
-			}
+			return m_log('unable to find file. if file exists, check read perms.', 'WARN');
 		
 		// read file.
 		m_log('file found. attempting to read.');
@@ -231,7 +294,7 @@ const config = (options: I_PDENV_ConfigOptions = {}): void =>
 
 					let line_key: string = line_split[0].replace(trim_exp, ''); // get, trim key.
 					let line_val: any    = line_split
-						.slice(1).join('') // get key, seamless join.
+						.slice(1).join('=') // get key, re-join.
 						.match(comment_exp)![0] // trim comments.
 						.replace(trim_exp, ''); // trim whitespace.
 
@@ -247,7 +310,7 @@ const config = (options: I_PDENV_ConfigOptions = {}): void =>
 						}
 
 					// parse values.
-					line_val = m_parse(line_val, string_parse_exps, array_parse_exps, number_parse_exps, bool_parse_exps, custom_parse_fn);
+					line_val = m_parse(line_val, string_parse_exps, array_parse_exps, object_parse_exps, number_parse_exps, bool_parse_exps, custom_parse_fn);
 					
 					process.pdenv[line_key] = line_val;
 				});
@@ -262,19 +325,17 @@ const config = (options: I_PDENV_ConfigOptions = {}): void =>
 // === === === === === === === === === === === === ===
 
 /** Calls given function when error occurs. */
-const onError = (callback: (() => void)): void => // TODO!!! make error-handling system.
-	{ m_on_error = callback; };
+const onError = (callback: PDENV_ERROR_CALLBACK): void => // TODO? make error-handling system.
+	{ m_onError = callback; };
 
 // === === === === === === === === === === === === ===
-
-type PDENV_CUSTOM_PARSE_FUNCTION =
-	(string_parse_exps: RegExp[], array_parse_exps: RegExp[], number_parse_exps: RegExp[], bool_parse_exps: RegExp[]) => any;
 
 /** Parses string and returns interpreted value. */
 const m_parse = (
 	data: string,
 	string_parse_exps : RegExp[],
 	array_parse_exps  : RegExp[],
+	object_parse_exps : RegExp[],
 	number_parse_exps : RegExp[],
 	bool_parse_exps   : RegExp[],
 	custom_parse_fn?: PDENV_CUSTOM_PARSE_FUNCTION
@@ -289,7 +350,7 @@ const m_parse = (
 
 		// use custom parse function if available.
 		if(custom_parse_fn != undefined)
-			return custom_parse_fn(string_parse_exps, array_parse_exps, number_parse_exps, bool_parse_exps);
+			return custom_parse_fn(string_parse_exps, array_parse_exps, object_parse_exps, number_parse_exps, bool_parse_exps);
 
 		// use default function if no custom parse function given.
 		// check if ending has asterisk with no escape character, just parse as string if so.
@@ -298,31 +359,47 @@ const m_parse = (
 			if(
 				ignore_parse_search != '\\*' &&
 				ignore_parse_search.split('')[1] == '*'
-			) return data;
+			) return data.slice(0, -1);
 
 		// test expressions.
 		let   is_string : boolean = m_testAll(data, string_parse_exps);
 		const is_array  : boolean = m_testAll(data, array_parse_exps);
+		const is_object : boolean = m_testAll(data, object_parse_exps);
 		const is_number : boolean = m_testAll(data, number_parse_exps); 
 		const is_bool   : boolean = m_testAll(data, bool_parse_exps);
 
-		// TODO make this much better please 👇
-		// if the string has string characters at the end, remove them.
-		if(is_string) if(data[0] == '\"') data = data.slice(1, -1);
+		// TODO make this much better 👇
+		// if the string has string characters at both the beginning and end, remove them.
+		if(data.length > 1)
+			{
+				let quotes = JSON.stringify([data[0], data[data.length - 1]])
+				if(is_string) if(quotes == JSON.stringify(['"', '"']))
+					data = data.slice(1, -1);
+			}
 
 		// default to parsing by string.
-		if(!(is_string && is_array && is_number && is_bool)) is_string = true;
+		if(!(is_string && is_array && is_object && is_number && is_bool)) is_string = true;
 		
 		// TODO check for if multiple are true.
-		// TODO impliment arrays.
 
 		if(is_number) return parseFloat(data);
 		else if(is_bool) return (data.toLowerCase() == 'true');
-		else if(is_array) return []; // TODO!!! IMPLIMENT ARRAYS!!!
-		else if(is_string) return data;
+		else if(is_array || is_object) return JSON.parse(data);
+		else if(is_string)
+			{
+				data = unescapejs(data);
+				return data;
+			}
 
 		// just in case.
 		return data;
+	};
+
+const m_replaceAll = (text: string, target: RegExp | string, replacement: string) =>
+	{
+		// TODO check speed? i don't remember how JS does the 'new' keyword thing, used to c++.
+		if(typeof target != 'string') return text.replace(new RegExp(target), replacement); // string
+		return text.replace(target, replacement); // RegExp
 	};
 
 /** Tests an array of expressions against a string.
@@ -377,9 +454,10 @@ const m_log = (message: string, priority: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR' 
 			: '';
 
 		console.log(`\x1b[0m\x1b[2m[pdenv]\x1b[0m ${prio_text}${message}`);
-
+		
 		// only call error callback if not a dummy log.
-		if(!dummy && m_on_error) m_on_error();
+		if(!dummy && priority == 'ERROR' && m_onError)
+			m_onError(message);
 	};
 
 // === === === === === === === === === === === === ===

@@ -1,12 +1,31 @@
 {
   "name": "pdenv",
-  "version": "0.7.0",
+  "version": "1.0.0",
   "description": "parsed .env variables from the start.",
-  "main": "lib/pdenv.js",
-  "types": "lib/pdenv.d.ts",
-  "repository": "https://github.com/KyeDoesnt/pdenv.git",
+  "readme": "README.md",
+  "main": "./lib/pdenv.js",
+  "types": "./lib/pdenv.d.ts",
   "author": "Kye Cedar",
   "license": "MIT",
+  "homepage": "https://github.com/kyedodev/pdenv",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kyedodev/pdenv"
+  },
+  "bugs": {
+    "url": "https://github.com/kyedodev/pdenv/issues"
+  },
+  "exports": {
+    ".": {
+      "require": "./lib/pdenv.js",
+      "types": "./lib/pdenv.d.ts",
+      "default": "./lib/pdenv.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib"
+  ],
   "scripts": {
     "lib:build": "rm ./lib/* && tsc",
     "lib:run": "node .",
@@ -15,10 +34,23 @@
     "example:run": "node ./example/dist/main.js",
     "example:dev": "tsnd --respawn --transpile-only --exit-child ./example/src/main.ts"
   },
+  "dependencies": {
+    "unescape-js": "^1.1.4"
+  },
   "devDependencies": {
     "@types/node": "^18.8.1",
     "nodemon": "^2.0.20",
     "ts-node-dev": "^2.0.0",
     "typescript": "^4.8.4"
-  }
+  },
+  "engines": {
+    "node": ">=12"
+  },
+  "keywords": [
+    "pdenv",
+    "parse",
+    "env",
+    ".env",
+    "environment"
+  ]
 }
