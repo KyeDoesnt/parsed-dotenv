@@ -1,6 +1,11 @@
+
 # pdenv ✨
 
+parse your `.env` file.  
+
 ![NPM_VERSION_BADGE]
+
+-----
 
 **disclaimer**: my formatting is shit. please try and bear with me,  
 i was just tryna make something that worked.
@@ -72,8 +77,14 @@ pdenv.config();
 > nesting allowed.  
 > `OBJECT={"STRING": "VALUE", "NUMBER": 3.14, "BOOLEAN": false}`
 
+-----
+
+`// kye cedar :3c`  
+kyedo( [twitter](KYE_TWITTER), [github](KYE_GITHUB) );
+
 
 
 <!-- LINKS -->
+[KYE_TWITTER]: https://twitter.com/kyedoart
+[KYE_GITHUB]: https://github.com/kyedodev
 [NPM_VERSION_BADGE]: https://img.shields.io/badge/dynamic/json?color=blue&label=version&prefix=v&query=version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fkyedodev%2Fpdenv%2Fmain%2Fpackage.json&style=flat-square&logo=npm
-
