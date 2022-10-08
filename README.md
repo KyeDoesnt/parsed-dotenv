@@ -80,7 +80,7 @@ pdenv.config();
 -----
 
 `// kye cedar :3c`  
-kyedo( [twitter](KYE_TWITTER), [github](KYE_GITHUB) );
+kyedo( [twitter][KYE_TWITTER], [github][KYE_GITHUB] );
 
 
 
