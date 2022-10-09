@@ -1,6 +1,6 @@
 {
   "name": "pdenv",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "parsed .env variables from the start.",
   "readme": "README.md",
   "main": "./lib/pdenv.js",

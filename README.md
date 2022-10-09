@@ -12,9 +12,9 @@ i was just tryna make something that worked.
 
 ```js
 {
-  '🏳‍⚧ trans rights': 'human rights.',
-  '✊🏿 black lives': 'matter.',
-  '🇺🇦 slava': 'ukraini!'
+  'trans rights': 'human rights.',
+  'black lives': 'matter.',
+  'slava': 'ukraini!'
 }
 ```
 
